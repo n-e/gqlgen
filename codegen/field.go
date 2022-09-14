@@ -513,7 +513,7 @@ func (f *Field) ShortResolverDeclaration() string {
 	res := "(ctx context.Context"
 
 	if !f.Object.Root {
-		res += fmt.Sprintf(", obj %s", templates.CurrentImports.LookupType(f.Object.Reference()))
+		res += fmt.Sprintf(", obj []%s", templates.CurrentImports.LookupType(f.Object.Reference()))
 	}
 	for _, arg := range f.Args {
 		res += fmt.Sprintf(", %s %s", arg.VarName, templates.CurrentImports.LookupType(arg.TypeReference.GO))
@@ -524,7 +524,7 @@ func (f *Field) ShortResolverDeclaration() string {
 		result = "<-chan " + result
 	}
 
-	res += fmt.Sprintf(") (%s, error)", result)
+	res += fmt.Sprintf(") ([]%s, []error)", result)
 	return res
 }
 
@@ -550,7 +550,7 @@ func (f *Field) CallArgs() string {
 	args := make([]string, 0, len(f.Args)+2)
 
 	if f.IsResolver {
-		args = append(args, "rctx")
+		args = append(args, "ctx")
 
 		if !f.Object.Root {
 			args = append(args, "obj")

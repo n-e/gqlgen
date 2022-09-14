@@ -23,17 +23,26 @@ func (ec *executionContext) _{{$object.Name}}(ctx context.Context, sel ast.Selec
 	}
 }
 {{- else }}
-func (ec *executionContext) _{{$object.Name}}(ctx context.Context, sel ast.SelectionSet{{ if not $object.Root }},obj {{$object.Reference | ref }}{{ end }}) graphql.Marshaler {
+func (ec *executionContext) _{{$object.Name}}(ctx context.Context, sel ast.SelectionSet{{ if not $object.Root }},obj []{{$object.Reference | ref }}{{ end }}) []graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, {{$object.Name|lcFirst}}Implementors)
     {{- if $object.Root }}
         ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
             Object: {{$object.Name|quote}},
         })
     {{end}}
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+
+    {{- if $object.Root }}
+    out := make([]*graphql.FieldSet,1)
+    {{- else }}
+	out := make([]*graphql.FieldSet,len(obj))
+    {{- end}}
+    for i := range out {
+        out[i] = graphql.NewFieldSet(fields)
+    }
+
+	// var invalids uint32
 	for i, field := range fields {
-        {{- if $object.Root }}
+        {{- if false }}
             innerCtx := graphql.WithRootFieldContext(ctx, &graphql.RootFieldContext{
                 Object: field.Name,
                 Field: field,
@@ -41,10 +50,12 @@ func (ec *executionContext) _{{$object.Name}}(ctx context.Context, sel ast.Selec
         {{end}}
         switch field.Name {
         case "__typename":
-            out.Values[i] = graphql.MarshalString({{$object.Name|quote}})
+            for i := range out {
+                out[i].Values[i] = graphql.MarshalString({{$object.Name|quote}})
+            }
         {{- range $field := $object.Fields }}
         case "{{$field.Name}}":
-            {{- if $field.IsConcurrent }}
+            {{- if false }}
                 field := field
 
                 innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -55,13 +66,13 @@ func (ec *executionContext) _{{$object.Name}}(ctx context.Context, sel ast.Selec
                     }()
                     res = ec._{{$object.Name}}_{{$field.Name}}(ctx, field{{if not $object.Root}}, obj{{end}})
                     {{- if $field.TypeReference.GQL.NonNull }}
-                        if res == graphql.Null {
+                        // if res == graphql.Null {
                             {{- if $object.IsConcurrent }}
-                                atomic.AddUint32(&invalids, 1)
+                                // atomic.AddUint32(&invalids, 1)
                             {{- else }}
-                                invalids++
+                                // invalids++
                             {{- end }}
-                        }
+                        // }
                     {{- end }}
                     return res
                 }
@@ -81,21 +92,25 @@ func (ec *executionContext) _{{$object.Name}}(ctx context.Context, sel ast.Selec
                 })
             {{- else }}
                 {{if $object.Root}}
-                    out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-                        return ec._{{$object.Name}}_{{$field.Name}}(ctx, field)
-                    })
+                    eeeeee := ec._{{$object.Name}}_{{$field.Name}}(ctx, field)
+                    for j := range eeeeee {
+                        out[j].Values[i] = eeeeee[j]
+                    }
                 {{else}}
-                    out.Values[i] = ec._{{$object.Name}}_{{$field.Name}}(ctx, field, obj)
+                    eeeeee := ec._{{$object.Name}}_{{$field.Name}}(ctx, field, obj)
+                    for j := range eeeeee {
+                        out[j].Values[i] = eeeeee[j]
+                    }
                 {{end}}
 
                 {{- if $field.TypeReference.GQL.NonNull }}
-                    if out.Values[i] == graphql.Null {
+                    // if out.Values[i] == graphql.Null {
                         {{- if $object.IsConcurrent }}
-                            atomic.AddUint32(&invalids, 1)
+                    //        atomic.AddUint32(&invalids, 1)
                         {{- else }}
-                            invalids++
+                    //        invalids++
                         {{- end }}
-                    }
+                    // }
                 {{- end }}
             {{- end }}
         {{- end }}
@@ -103,9 +118,17 @@ func (ec *executionContext) _{{$object.Name}}(ctx context.Context, sel ast.Selec
             panic("unknown field " + strconv.Quote(field.Name))
         }
 	}
-	out.Dispatch()
-	if invalids > 0 { return graphql.Null }
-	return out
+    for i := range out {
+	    out[i].Dispatch()
+    }
+	// if invalids > 0 { return graphql.Null }
+
+    outm:= make([]graphql.Marshaler,len(out))
+    for i:= range out {
+        outm[i] = out[i]
+    }
+
+	return outm
 }
 {{- end }}
 

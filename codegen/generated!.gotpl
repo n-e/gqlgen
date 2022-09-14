@@ -159,7 +159,7 @@
 					data := ec._{{.QueryRoot.Name}}(ctx, rc.Operation.SelectionSet)
 				{{- end }}
 				var buf bytes.Buffer
-				data.MarshalGQL(&buf)
+				data[0].MarshalGQL(&buf) // data is a one-element array since Query is an object, never an array
 
 				return &graphql.Response{
 					Data:       buf.Bytes(),
